@@ -1,0 +1,94 @@
+service: todo
+
+frameworkVersion: "3"
+
+provider:
+  name: aws
+  runtime: nodejs16.x
+  stage: dev
+  region: us-west-1
+  environment:
+    TODO_TABLE: ${self:service}-${self:provider.stage}
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - dynamodb:Scan
+        - dynamodb:Query
+        - dynamodb:PutItem
+        - dynamodb.GetItem
+        - dynamodb:UpdateItem
+        - dynamodb:DeleteItem
+      Resource: "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:provider.environment.TODO_TABLE}"
+resources:
+  Resources:
+    TodoDynamoDbTable:
+      Type: AWS::DynamoDB::Table
+      DeletionPolicy: Retain
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        TableName: ${self:provider.environment.TODO_TABLE}
+
+functions:
+  create:
+    handler: actions/create.create
+    events:
+      - http:
+          path: todo
+          method: post
+          cors: true
+  list:
+    handler: actions/list.list
+    events:
+      - http:
+          path: todo
+          method: get
+          cors: true
+  get:
+    handler: actions/get.get
+    events:
+      - http:
+          path: todo/{id}
+          method: get
+          cors: true
+  delete:
+    handler: actions/delete.delete
+    events:
+      - http:
+          path: todo/{id}
+          method: delete
+          cors: true
+  update:
+    handler: actions/update.update
+    events:
+      - http:
+          path: todo/{id}
+          method: put
+          cors: true
+
+plugins:
+  - serverless-offline
+  - serverless-dynamodb-local
+
+custom:
+  serverless-offline:
+    #httpPort: 3000
+    # resourceRoutes: true
+    httpPort: 4000
+    websocketPort: 4001
+    lambdaPort: 4002
+    noPrependStageInUrl: true
+  dynamodb:
+    stages:
+      - ${self:provider.stage}
+    start:
+      port: 8000
+      inMemory: true
+      migrate: true
